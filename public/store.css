@@ -4,3 +4,19 @@
 @media(min-width:1500px){.hero-image{max-height:580px}}@media(max-width:800px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.brand{font-size:23px}.account-label{display:none}}@media(max-width:480px){header{height:80px}.brand{font-size:21px;gap:8px}.brand img{width:52px;height:52px}.container{padding:0 16px}.header-actions{gap:6px}.hero-image{aspect-ratio:3.09;object-fit:contain}.hero-action{padding-top:18px;padding-bottom:18px}.ticker{font-size:9px;letter-spacing:2.5px}.vitrine{padding-top:32px;padding-bottom:56px}h1{font-size:32px}.grid{gap:12px}.card-body{padding:12px}.card h2{font-size:19px}.categories{gap:6px}.categories button{padding:8px 10px;font-size:11px}.filters{gap:8px}.filters input,.filters select{font-size:12px;padding:8px}.wa{width:50px;height:50px;right:16px;bottom:16px}.footer-links{gap:14px}.product-wa{font-size:11px}}
 
 @media(max-width:360px){.brand{font-size:18px;gap:6px}.brand img{width:48px;height:48px}.header-actions{gap:2px}.header-actions .icon-btn{padding:8px}.container{padding-left:12px;padding-right:12px}}
+
+/* Faixa dourada com quatro faces e rotação em perspectiva. */
+.ticker{position:relative;height:50px;padding:0;background:transparent;perspective:900px;overflow:hidden;isolation:isolate}
+.ticker-rotor{position:relative;top:8px;height:34px;transform-style:preserve-3d;animation:ticker-turn 16s ease-in-out infinite;will-change:transform}
+.ticker-face{position:absolute;inset:0;overflow:hidden;display:flex;align-items:center;backface-visibility:hidden;background:linear-gradient(100deg,#f1d788 0%,#d59c33 48%,#f5df9b 100%);border-top:1px solid #ffeab0;border-bottom:1px solid #9d6d20;box-shadow:0 4px 12px #0007;color:#16120a;font-size:11px;font-weight:800;letter-spacing:4px;line-height:32px;text-transform:uppercase}
+.ticker-front{transform:translateZ(17px)}
+.ticker-top{transform:rotateX(90deg) translateZ(17px);filter:brightness(1.08)}
+.ticker-back{transform:rotateX(180deg) translateZ(17px)}
+.ticker-bottom{transform:rotateX(270deg) translateZ(17px);filter:brightness(.92)}
+.ticker-track{display:flex;width:max-content;flex-shrink:0;animation:ticker-scroll 45s linear infinite;will-change:transform}
+.ticker-track span{display:block;flex-shrink:0;white-space:pre}
+.ticker:hover .ticker-rotor,.ticker:hover .ticker-track{animation-play-state:paused}
+@keyframes ticker-turn{0%,17%{transform:rotateX(0deg)}25%,42%{transform:rotateX(-90deg)}50%,67%{transform:rotateX(-180deg)}75%,92%{transform:rotateX(-270deg)}100%{transform:rotateX(-360deg)}}
+@keyframes ticker-scroll{to{transform:translateX(-50%)}}
+@media(max-width:480px){.ticker-face{font-size:9px;letter-spacing:2.5px}.ticker-track{animation-duration:55s}}
+@media(prefers-reduced-motion:reduce){.ticker-rotor,.ticker-track{animation:none;will-change:auto}.ticker-rotor{transform:none}}
