@@ -23,12 +23,13 @@ const W=f=>(q,r,n)=>f(q,r,n).catch(e=>r.status(500).json({erro:'Erro no servidor
 app.get('/api/products',W(async(q,r)=>{const{q:s='',cat='',size='',color=''}=q.query;
  const p=await db.query(`select p.*,coalesce(json_agg(json_build_object('id',v.id,'size',v.size,'color',v.color,'stock',v.stock)) filter(where v.id is not null),'[]') variants from products p left join variants v on v.product_id=p.id where p.name ilike $1 and ($2='' or p.category=$2) group by p.id order by p.id desc`,[`%${s}%`,cat]);
  r.json(p.rows.filter(x=>(!size||x.variants.some(v=>v.size==size))&&(!color||x.variants.some(v=>v.color==color))))}));
-app.post('/api/register',async(q,r)=>{const{name,email,phone,password}=q.body;if(!name||!email||!password)return r.status(400).json({erro:'Preencha tudo'});
- try{const u=(await db.query('insert into users(name,email,phone,pass) values($1,$2,$3,$4) returning id,name,email',[name,email,phone,await bcrypt.hash(password,10)])).rows[0];
- r.json({token:jwt.sign({id:u.id,name:u.name},SECRET,{expiresIn:'30d'}),name:u.name})}catch{r.status(400).json({erro:'E-mail já cadastrado'})}});
-app.post('/api/login',async(q,r)=>{const u=(await db.query('select * from users where email=$1',[q.body.email])).rows[0];
- if(!u||!await bcrypt.compare(q.body.password||'',u.pass))return r.status(401).json({erro:'Dados inválidos'});
- r.json({token:jwt.sign({id:u.id,name:u.name},SECRET,{expiresIn:'30d'}),name:u.name})});
+app.post('/api/register',(q,r)=>r.status(403).json({erro:'Cadastro indisponível'}));
+app.post('/api/login',W(async(q,r)=>{
+ const name=process.env.STORE_LOGIN_NAME;
+ if(!name||q.body.name!==name||q.body.password!==ADMIN)return r.status(401).json({erro:'Nome ou senha inválidos'});
+ const u=(await db.query("insert into users(name,email,pass) values($1,$2,$3) on conflict(email) do update set name=excluded.name returning id,name",[name,'store-access@wg.invalid',await bcrypt.hash(ADMIN,10)])).rows[0];
+ r.json({token:jwt.sign({id:u.id,name:u.name},SECRET,{expiresIn:'30d'}),name:u.name})
+}));
 app.post('/api/orders',auth,async(q,r)=>{const{items,address,cep,delivery,payment,phone}=q.body,c=await db.connect();
  try{await c.query('begin');let sub=0;const list=[];
  for(const i of items){const v=(await c.query('select v.*,p.name,p.price from variants v join products p on p.id=v.product_id where v.id=$1 for update',[i.variant_id])).rows[0];
