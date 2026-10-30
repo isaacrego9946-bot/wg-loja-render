@@ -22,3 +22,5 @@
 @media(prefers-reduced-motion:reduce){.ticker-rotor{animation-duration:32s}.ticker-track{animation-duration:90s}}
 
 .ticker-control{position:absolute;right:8px;top:10px;z-index:2;padding:2px 8px;background:#100e08d9;color:#f2d486;border:1px solid #ddba69;border-radius:3px;font-size:12px;line-height:24px}.ticker.paused .ticker-rotor,.ticker.paused .ticker-track{animation-play-state:paused}
+
+.whatsapp-help{padding-top:28px;padding-bottom:44px;border-top:1px solid var(--line)}.whatsapp-help h2{font-size:30px;margin:0 0 8px}.whatsapp-help p{color:var(--muted);margin-bottom:20px}

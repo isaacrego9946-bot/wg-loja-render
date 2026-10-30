@@ -7,7 +7,7 @@ app.use(express.json({limit:'5mb'}));app.use(express.static('public'));app.get('
 const db=new Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false}});
 if(!process.env.JWT_SECRET||!process.env.ADMIN_PASSWORD||process.env.JWT_SECRET.length<24){console.error('Defina JWT_SECRET (24+ caracteres) e ADMIN_PASSWORD no ambiente.');process.exit(1)}
 const SECRET=process.env.JWT_SECRET,ADMIN=process.env.ADMIN_PASSWORD;
-const WA=process.env.WHATSAPP||'5516999999999';
+const WA=process.env.WHATSAPP||'5516988166427';
 db.on('error',e=>console.error('db',e.message));process.on('unhandledRejection',e=>console.error('erro',e&&e.message));
 (async()=>{await db.query(`
 create table if not exists products(id serial primary key,name text,category text,price numeric(10,2),image text,description text);
@@ -34,19 +34,25 @@ app.post('/api/login',W(async(q,r)=>{
  const u=(await db.query("insert into users(name,email,pass) values($1,$2,$3) on conflict(email) do update set name=excluded.name returning id,name",[name,'store-access@wg.invalid',await bcrypt.hash(ADMIN,10)])).rows[0];
  r.json({token:jwt.sign({id:u.id,name:u.name},SECRET,{expiresIn:'30d'}),name:u.name})
 }));
-app.post('/api/orders',auth,W(async(q,r)=>{const{items,address,cep,delivery,payment,phone}=q.body;
+const checkoutAuth=(q,r,n)=>{if(q.headers.authorization&&q.headers.authorization!=='Bearer'&&q.headers.authorization!=='Bearer '){try{q.u=jwt.verify(q.headers.authorization.slice(7),SECRET);if(!Number.isSafeInteger(q.u.id))return r.status(401).json({erro:'Entre novamente na conta.'});return n()}catch{return r.status(401).json({erro:'Sessão expirada. Saia da conta para comprar como visitante.'})}}
+ const name=String(q.body.customer_name||'').trim(),phone=String(q.body.phone||'').replace(/\D/g,'');
+ if(name.length<2||name.length>100||!/^\d{10,13}$/.test(phone))return r.status(400).json({erro:'Informe seu nome e telefone com DDD.'});
+ if(!['entrega','retirada'].includes(q.body.delivery)||!['pix','cartao'].includes(q.body.payment))return r.status(400).json({erro:'Escolha entrega e pagamento.'});
+ if(q.body.delivery==='entrega'&&(String(q.body.address||'').trim().length<5||String(q.body.cep||'').replace(/\D/g,'').length!==8))return r.status(400).json({erro:'Informe o endereço completo e um CEP com 8 dígitos.'});
+ q.u={id:0,name};n();};
+app.post('/api/orders',checkoutAuth,W(async(q,r)=>{const{items,address,cep,delivery,payment,phone}=q.body;
  if(!Array.isArray(items)||!items.length||items.length>100||items.some(i=>!i||!Number.isSafeInteger(i.variant_id)||i.variant_id<=0||!Number.isSafeInteger(i.qty)||i.qty<=0))return r.status(400).json({erro:'Informe itens e quantidades inteiras maiores que zero.'});
  const c=await db.connect();
  try{await c.query('begin');const key=q.body.request_key;
  if(key!==undefined&&(!/^[a-f0-9-]{36}$/i.test(key)))throw Error('Identificador de pedido inválido');
- const hash=require('crypto').createHash('sha256').update(JSON.stringify({items,address,cep,delivery,payment,phone})).digest('hex');
+ const hash=require('crypto').createHash('sha256').update(JSON.stringify({items,address,cep,delivery,payment,phone,customer_name:q.body.customer_name})).digest('hex');
  if(key){await c.query('select pg_advisory_xact_lock($1,hashtext($2))',[q.u.id,key]);const old=(await c.query('select id,total,request_hash from orders where user_id=$1 and request_key=$2',[q.u.id,key])).rows[0];if(old){if(old.request_hash!==hash)throw Error('O pedido anterior já foi enviado com outros dados. Atualize a página.');await c.query('commit');return r.json({id:old.id,total:+old.total})}}
  let sub=0;const list=[];
  for(const i of [...items].sort((a,b)=>a.variant_id-b.variant_id)){const v=(await c.query('select v.*,p.name,p.price from variants v join products p on p.id=v.product_id where v.id=$1 for update',[i.variant_id])).rows[0];
   if(!v||v.stock<i.qty)throw Error(v?'Estoque insuficiente: '+v.name+' ('+v.size+'/'+v.color+'). Disponível: '+v.stock:'Produto indisponível.');
   await c.query('update variants set stock=stock-$1 where id=$2',[i.qty,v.id]);sub+=v.price*i.qty;list.push({product_id:v.product_id,name:v.name,size:v.size,color:v.color,qty:i.qty,price:+v.price})}
  const ship=delivery=='retirada'?0:frete(cep).entrega,tot=sub+ship;
- const o=(await c.query('insert into orders(user_id,customer,items,shipping,total,payment,request_key,request_hash) values($1,$2,$3,$4,$5,$6,$7,$8) returning id',[q.u.id,{name:q.u.name,phone,address,cep,delivery},JSON.stringify(list),ship,tot,payment,key||null,hash])).rows[0];
+ const o=(await c.query('insert into orders(user_id,customer,items,shipping,total,payment,request_key,request_hash) values($1,$2,$3,$4,$5,$6,$7,$8) returning id',[q.u.id,{name:String(q.body.customer_name||q.u.name).trim().slice(0,100),phone,address,cep,delivery},JSON.stringify(list),ship,tot,payment,key||null,hash])).rows[0];
  await c.query('commit');r.json({id:o.id,total:tot})}catch(e){await c.query('rollback');r.status(400).json({erro:e.message})}finally{c.release()}}));
 app.get('/api/orders/mine',auth,W(async(q,r)=>r.json((await db.query('select id,items,total,status,created_at from orders where user_id=$1 order by id desc',[q.u.id])).rows)));
 app.post('/api/admin/login',(q,r)=>q.body.password===ADMIN?r.json({token:jwt.sign({admin:1},SECRET,{expiresIn:'12h'})}):r.status(401).json({erro:'Senha incorreta'}));
