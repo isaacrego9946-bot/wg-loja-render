@@ -19,4 +19,6 @@
 @keyframes ticker-turn{0%,17%{transform:rotateX(0deg)}25%,42%{transform:rotateX(-90deg)}50%,67%{transform:rotateX(-180deg)}75%,92%{transform:rotateX(-270deg)}100%{transform:rotateX(-360deg)}}
 @keyframes ticker-scroll{to{transform:translateX(-50%)}}
 @media(max-width:480px){.ticker-face{font-size:9px;letter-spacing:2.5px}.ticker-track{animation-duration:55s}}
-@media(prefers-reduced-motion:reduce){.ticker-rotor,.ticker-track{animation:none;will-change:auto}.ticker-rotor{transform:none}}
+@media(prefers-reduced-motion:reduce){.ticker-rotor{animation-duration:32s}.ticker-track{animation-duration:90s}}
+
+.ticker-control{position:absolute;right:8px;top:10px;z-index:2;padding:2px 8px;background:#100e08d9;color:#f2d486;border:1px solid #ddba69;border-radius:3px;font-size:12px;line-height:24px}.ticker.paused .ticker-rotor,.ticker.paused .ticker-track{animation-play-state:paused}
