@@ -30,14 +30,16 @@ app.post('/api/login',W(async(q,r)=>{
  const u=(await db.query("insert into users(name,email,pass) values($1,$2,$3) on conflict(email) do update set name=excluded.name returning id,name",[name,'store-access@wg.invalid',await bcrypt.hash(ADMIN,10)])).rows[0];
  r.json({token:jwt.sign({id:u.id,name:u.name},SECRET,{expiresIn:'30d'}),name:u.name})
 }));
-app.post('/api/orders',auth,async(q,r)=>{const{items,address,cep,delivery,payment,phone}=q.body,c=await db.connect();
+app.post('/api/orders',auth,W(async(q,r)=>{const{items,address,cep,delivery,payment,phone}=q.body;
+ if(!Array.isArray(items)||!items.length||items.length>100||items.some(i=>!i||!Number.isSafeInteger(i.variant_id)||i.variant_id<=0||!Number.isSafeInteger(i.qty)||i.qty<=0))return r.status(400).json({erro:'Informe itens e quantidades inteiras maiores que zero.'});
+ const c=await db.connect();
  try{await c.query('begin');let sub=0;const list=[];
- for(const i of items){const v=(await c.query('select v.*,p.name,p.price from variants v join products p on p.id=v.product_id where v.id=$1 for update',[i.variant_id])).rows[0];
-  if(!v||v.stock<i.qty)throw Error('Sem estoque: '+(v?v.name:'item'));
+ for(const i of [...items].sort((a,b)=>a.variant_id-b.variant_id)){const v=(await c.query('select v.*,p.name,p.price from variants v join products p on p.id=v.product_id where v.id=$1 for update',[i.variant_id])).rows[0];
+  if(!v||v.stock<i.qty)throw Error(v?'Estoque insuficiente: '+v.name+' ('+v.size+'/'+v.color+'). Disponível: '+v.stock:'Produto indisponível.');
   await c.query('update variants set stock=stock-$1 where id=$2',[i.qty,v.id]);sub+=v.price*i.qty;list.push({name:v.name,size:v.size,color:v.color,qty:i.qty,price:+v.price})}
  const ship=delivery=='retirada'?0:frete(cep).entrega,tot=sub+ship;
  const o=(await c.query('insert into orders(user_id,customer,items,shipping,total,payment) values($1,$2,$3,$4,$5,$6) returning id',[q.u.id,{name:q.u.name,phone,address,cep,delivery},JSON.stringify(list),ship,tot,payment])).rows[0];
- await c.query('commit');r.json({id:o.id,total:tot})}catch(e){await c.query('rollback');r.status(400).json({erro:e.message})}finally{c.release()}});
+ await c.query('commit');r.json({id:o.id,total:tot})}catch(e){await c.query('rollback');r.status(400).json({erro:e.message})}finally{c.release()}}));
 app.get('/api/orders/mine',auth,async(q,r)=>r.json((await db.query('select id,items,total,status,created_at from orders where user_id=$1 order by id desc',[q.u.id])).rows));
 app.post('/api/admin/login',(q,r)=>q.body.password===ADMIN?r.json({token:jwt.sign({admin:1},SECRET,{expiresIn:'12h'})}):r.status(401).json({erro:'Senha incorreta'}));
 app.post('/api/admin/products',adm,async(q,r)=>{const{id,name,category,price,image,description,variants=[]}=q.body;let pid=id;
